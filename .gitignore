@@ -1,4 +1,8 @@
-zig-cache/
+!.gitignore
+!README.md
+!*/
+!build.zig
+!src/*.zig
+src/*.fs
 zig-out/
-!src/*.fs
-
+zig-cache/
