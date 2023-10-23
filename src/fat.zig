@@ -1,7 +1,7 @@
 //! https://academy.cba.mit.edu/classes/networking_communications/SD/FAT.pdf
 const std = @import("std");
 
-pub const ReservedRegion = struct {
+pub const BootSector = struct {
     bpb_common: BPB_common,
     bpb_extended: ExtentUnion,
 
@@ -10,7 +10,7 @@ pub const ReservedRegion = struct {
         fat32: BPB_Extended_32,
     };
 
-    pub fn read(file: std.fs.File) !ReservedRegion {
+    pub fn read(file: std.fs.File) !BootSector {
         var common = try BPB_common.read(file, 0);
         var extended: ExtentUnion = undefined;
         if (common.RootEntCnt != 0) {
@@ -26,19 +26,19 @@ pub const ReservedRegion = struct {
     }
 };
 
-test "ReservedRegion16" {
+test "BootSector16" {
     var fat16 = try std.fs.cwd().openFile("testFat16.fs", .{});
     defer fat16.close();
 
-    const rr = try ReservedRegion.read(fat16);
-    std.debug.print("\n{any}\n{any}\n", .{ rr.bpb_common, rr.bpb_extended });
+    const bs = try BootSector.read(fat16);
+    std.debug.print("\n{any}\n{any}\n", .{ bs.bpb_common, bs.bpb_extended });
 }
-test "ReservedRegion32" {
+test "BootSector32" {
     var fat32 = try std.fs.cwd().openFile("testFat32.fs", .{});
     defer fat32.close();
 
-    const rr = try ReservedRegion.read(fat32);
-    std.debug.print("\n{any}\n{any}\n", .{ rr.bpb_common, rr.bpb_extended });
+    const bs = try BootSector.read(fat32);
+    std.debug.print("\n{any}\n{any}\n", .{ bs.bpb_common, bs.bpb_extended });
 }
 
 /// Bios Parameter Block common to F12, F16 and F32.
