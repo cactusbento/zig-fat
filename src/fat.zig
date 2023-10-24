@@ -1,11 +1,14 @@
+//! Based off of "Microsoft FAT Specification"
 //! https://academy.cba.mit.edu/classes/networking_communications/SD/FAT.pdf
 const std = @import("std");
 
-/// Common to all FAT File Systems.
+/// See "Section 3: Boot Sector and BPB"
 pub const BootSector = struct {
+    /// See "Secion 3.1"
     bpb_common: BPB_common,
     bpb_extended: ExtentUnion,
 
+    /// See "Section 3.2" and "Section 3.3"
     pub const ExtentUnion = union(enum) {
         fat1216: BPB_Extended_1216,
         fat32: BPB_Extended_32,
@@ -43,9 +46,85 @@ test "BootSector32" {
 }
 
 /// Only needed on FAT32
-pub const FSInformationSector = struct {};
+/// See "Section 5: File System Information (FSInfo) Structure"
+pub const FSInfoSector = struct {
+    pub const valid_lead_signature: u32 = 0x41615252;
+    pub const valid_struct_signature: u32 = 0x61417272;
+    pub const valid_trail_signature: u32 = 0xAA550000;
+    /// Lead signature used to validate the beginning of the FSInfo Structure.
+    LeadSig: u32 = valid_lead_signature,
 
+    // Just skip 480 bytes when reading.
+    // Reserved1: [480]u8,
+
+    /// Additional signature validating the integrity of the FSInfo structure.
+    StrucSig: u32 = valid_struct_signature,
+
+    /// Counts the last known free cluster count on the volume.
+    ///
+    /// The value 0xFFFFFFFF indicates that the free cluster count is unknown.
+    Free_Count: u32,
+
+    Nxt_Free: u32,
+
+    ///Trail Signature used to validate the integrity of the FSInfo Sector.
+    TrailSig: u32 = valid_trail_signature,
+
+    /// FSInfoSector is always found in sector 1.
+    pub fn read(file: std.fs.File, bs: BootSector) !FSInfoSector {
+        var ret: FSInfoSector = undefined;
+
+        const offset = bs.bpb_common.BytsPerSec;
+
+        try file.seekTo(offset);
+
+        const self_ti: std.builtin.Type.Struct = @typeInfo(FSInfoSector).Struct;
+
+        var curr_offset: usize = 0;
+        inline for (self_ti.fields) |field| {
+            const f: std.builtin.Type.StructField = field;
+            try file.seekTo(offset + curr_offset);
+
+            switch (@typeInfo(f.type)) {
+                .Int => |I| {
+                    const size: usize = I.bits / 8;
+                    var buf: [size]u8 = undefined;
+                    if (try file.read(&buf) != size) return error.EndOfFile;
+
+                    const number: f.type = std.mem.readIntSlice(f.type, &buf, .Little);
+                    @field(ret, f.name) = number;
+                    curr_offset += size;
+                },
+                else => unreachable,
+            }
+
+            if (std.mem.startsWith(u8, f.name, "LeadSig")) {
+                curr_offset += 480;
+            }
+            if (std.mem.startsWith(u8, f.name, "Nxt_Free")) {
+                curr_offset += 12;
+            }
+        }
+
+        return ret;
+    }
+};
+
+test "FAT32FSInfo" {
+    var fat32 = try std.fs.cwd().openFile("testFat32.iso", .{});
+    defer fat32.close();
+
+    const bs = try BootSector.read(fat32);
+    const fsinfo = try FSInfoSector.read(fat32, bs);
+
+    std.debug.print("\n{}\n", .{fsinfo});
+}
+
+/// See "Section 4: FAT"
 pub const FileAllocationTable = union(enum) {
+    //! The first two entries are reserved
+    //! Table[0] & 0xF8
+    //! Table[1] & 0xFF
     fat16: []u16,
     fat32: []u32,
 
