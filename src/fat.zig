@@ -1,6 +1,7 @@
 //! https://academy.cba.mit.edu/classes/networking_communications/SD/FAT.pdf
 const std = @import("std");
 
+/// Common to all FAT File Systems.
 pub const BootSector = struct {
     bpb_common: BPB_common,
     bpb_extended: ExtentUnion,
@@ -39,6 +40,66 @@ test "BootSector32" {
 
     const bs = try BootSector.read(fat32);
     std.debug.print("\n{any}\n{any}\n", .{ bs.bpb_common, bs.bpb_extended });
+}
+
+/// Only needed on FAT32
+pub const FSInformationSector = struct {};
+
+pub const FileAllocationTable = union(enum) {
+    fat16: []u16,
+    fat32: []u32,
+
+    /// Use Deinit to free FAT table.
+    pub fn read(allocator: std.mem.Allocator, file: std.fs.File, bs: BootSector) !FileAllocationTable {
+        // Offset of the first FAT table
+        const fat_offset = bs.bpb_common.RsvdSecCnt * bs.bpb_common.BytsPerSec;
+        const fat_size = bs.bpb_common.BytsPerSec * switch (bs.bpb_extended) {
+            .fat1216 => bs.bpb_common.FATSz16,
+            .fat32 => bs.bpb_extended.fat32.FATSz32,
+        };
+
+        var ret: FileAllocationTable = switch (bs.bpb_extended) {
+            .fat1216 => .{ .fat16 = try allocator.alloc(u16, fat_size / 2) },
+            .fat32 => .{ .fat32 = try allocator.alloc(u32, fat_size / 4) },
+        };
+
+        try file.seekTo(fat_offset);
+        const reader = file.reader();
+
+        switch (ret) {
+            inline else => |slice| {
+                for (slice) |*v| {
+                    v.* = try reader.readIntLittle(@TypeOf(v.*));
+                }
+            },
+        }
+        return ret;
+    }
+
+    pub fn deinit(self: *FileAllocationTable, allocator: std.mem.Allocator) void {
+        switch (self.*) {
+            inline else => |s| allocator.free(s),
+        }
+    }
+};
+
+test "FAT16Table" {
+    const alloc = std.testing.allocator;
+    var fat16 = try std.fs.cwd().openFile("testFat16.fs", .{});
+    defer fat16.close();
+
+    const bs = try BootSector.read(fat16);
+    var table = try FileAllocationTable.read(alloc, fat16, bs);
+    defer table.deinit(alloc);
+
+    std.debug.print("\nFAT16 Table\n", .{});
+    for (table.fat16, 0..) |entry, i| {
+        std.debug.print("{x:0>4} ", .{
+            entry,
+        });
+        if (i > 256) break;
+    }
+    std.debug.print("\n", .{});
 }
 
 /// Bios Parameter Block common to F12, F16 and F32.
