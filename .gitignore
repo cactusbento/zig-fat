@@ -4,5 +4,6 @@
 !build.zig
 !src/*.zig
 src/*.fs
+src/*.iso
 zig-out/
 zig-cache/

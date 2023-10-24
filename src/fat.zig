@@ -28,14 +28,14 @@ pub const BootSector = struct {
 };
 
 test "BootSector16" {
-    var fat16 = try std.fs.cwd().openFile("testFat16.fs", .{});
+    var fat16 = try std.fs.cwd().openFile("testFat16.iso", .{});
     defer fat16.close();
 
     const bs = try BootSector.read(fat16);
     std.debug.print("\n{any}\n{any}\n", .{ bs.bpb_common, bs.bpb_extended });
 }
 test "BootSector32" {
-    var fat32 = try std.fs.cwd().openFile("testFat32.fs", .{});
+    var fat32 = try std.fs.cwd().openFile("testFat32.iso", .{});
     defer fat32.close();
 
     const bs = try BootSector.read(fat32);
@@ -85,7 +85,7 @@ pub const FileAllocationTable = union(enum) {
 
 test "FAT16Table" {
     const alloc = std.testing.allocator;
-    var fat16 = try std.fs.cwd().openFile("testFat16.fs", .{});
+    var fat16 = try std.fs.cwd().openFile("testFat16.iso", .{});
     defer fat16.close();
 
     const bs = try BootSector.read(fat16);
@@ -178,10 +178,10 @@ pub const BPB_common = struct {
 };
 
 test "bpbc" {
-    var fat16 = try std.fs.cwd().openFile("testFat16.fs", .{});
+    var fat16 = try std.fs.cwd().openFile("testFat16.iso", .{});
     defer fat16.close();
 
-    var fat32 = try std.fs.cwd().openFile("testFat32.fs", .{});
+    var fat32 = try std.fs.cwd().openFile("testFat32.iso", .{});
     defer fat32.close();
 
     const bpbc16 = try BPB_common.read(fat16, 0);
