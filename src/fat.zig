@@ -129,7 +129,7 @@ pub const FileAllocationTable = union(enum) {
     fat32: []u32,
 
     /// Use Deinit to free FAT table.
-    pub fn read(allocator: std.mem.Allocator, file: std.fs.File, bs: BootSector) !FileAllocationTable {
+    pub fn readTable(allocator: std.mem.Allocator, file: std.fs.File, bs: BootSector) !FileAllocationTable {
         // Offset of the first FAT table
         const fat_offset = bs.bpb_common.RsvdSecCnt * bs.bpb_common.BytsPerSec;
         const fat_size = bs.bpb_common.BytsPerSec * switch (bs.bpb_extended) {
@@ -168,7 +168,7 @@ test "FAT16Table" {
     defer fat16.close();
 
     const bs = try BootSector.read(fat16);
-    var table = try FileAllocationTable.read(alloc, fat16, bs);
+    var table = try FileAllocationTable.readTable(alloc, fat16, bs);
     defer table.deinit(alloc);
 
     std.debug.print("\nFAT16 Table\n", .{});
@@ -399,3 +399,5 @@ pub const BPB_Extended_32 = struct {
         return ret;
     }
 };
+
+pub const LongFileName = struct {};
